@@ -91,6 +91,7 @@ type SqsLengthySubscriber struct {
 }
 
 func (l *SqsLengthySubscriber) Start(quit, done chan error) error {
+	if l.
 	// Get the queue's visibility timeout so we can do a visibility extender goroutine.
 	var visibilityTm int = -1
 	var err error
