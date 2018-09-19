@@ -17,35 +17,21 @@ func processCallback(v []byte) error {
 	}(time.Now())
 
 	log.Printf("raw=%v", string(v))
+	log.Printf("simulate lengthy work (1min)")
+	time.Sleep(time.Second * 60)
 
 	return nil
-}
-
-func run(quit, done chan error) {
-	var err error
-
-	subquit := make(chan error)
-	subdone := make(chan error)
-	queue := "testlengthysqs"
-
-	// Start listening to queue message.
-	go func() {
-		ls := longsubsqs.NewSqsLengthySubscriber(queue, processCallback)
-		err = ls.Start(subquit, subdone)
-		if err != nil {
-			log.Fatalf("start long processing for %v failed, err=%v", queue, err)
-		}
-	}()
-
-	subquit <- <-quit
-	done <- <-subdone
 }
 
 func main() {
 	quit := make(chan error)
 	done := make(chan error)
+	queue := "lengthysqs"
 
-	go run(quit, done)
+	go func() {
+		ls := longsubsqs.NewSqsLengthySubscriber(queue, processCallback)
+		ls.Start(quit, done) // error is propagated to 'done' channel.
+	}()
 
 	// Interrupt handler.
 	go func() {
@@ -56,6 +42,6 @@ func main() {
 
 	err := <-done
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 }

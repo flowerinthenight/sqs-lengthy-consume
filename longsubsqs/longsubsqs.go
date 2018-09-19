@@ -1,12 +1,15 @@
 package longsubsqs
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	gzawscfg "github.com/NYTimes/gizmo/config/aws"
+	gzpubsub "github.com/NYTimes/gizmo/pubsub"
 	awspubsub "github.com/NYTimes/gizmo/pubsub/aws"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -91,56 +94,56 @@ type SqsLengthySubscriber struct {
 }
 
 func (l *SqsLengthySubscriber) Start(quit, done chan error) error {
-	if l.
 	// Get the queue's visibility timeout so we can do a visibility extender goroutine.
 	var visibilityTm int = -1
 	var err error
 
-	for once := 1; once > 0; once-- {
-		var vistm string = "VisibilityTimeout"
+	defer func(e *error) {
+		done <- *e
+	}(&err)
 
-		sess, err := session.NewSession()
-		if err != nil {
-			log.Printf("new aws session failed, err=%v", err)
-			break
-		}
+	var vistm string = "VisibilityTimeout"
 
-		svc := sqs.New(sess, &aws.Config{
-			Region: aws.String(l.region),
-		})
-
-		urlResp, err := svc.GetQueueUrl(&sqs.GetQueueUrlInput{
-			QueueName:              &l.queue,
-			QueueOwnerAWSAccountId: &l.acctId,
-		})
-
-		if err != nil {
-			log.Printf("get queue url failed, err=%v", err)
-			break
-		}
-
-		attrOut, err := svc.GetQueueAttributes(&sqs.GetQueueAttributesInput{
-			AttributeNames: []*string{&vistm},
-			QueueUrl:       urlResp.QueueUrl,
-		})
-
-		if err != nil {
-			log.Printf("get queue url failed, err=%v", err)
-			break
-		}
-
-		val, err := strconv.Atoi(*attrOut.Attributes[vistm])
-		if err != nil {
-			log.Printf("atoi failed, err=%v", err)
-			break
-		}
-
-		visibilityTm = val
+	sess, err := session.NewSession()
+	if err != nil {
+		return err
 	}
 
-	if visibilityTm < 0 {
-		log.Printf("visibility timeout get failed, err=%v", err)
+	svc := sqs.New(sess, &aws.Config{
+		Region: aws.String(l.region),
+	})
+
+	urlResp, err := svc.GetQueueUrl(&sqs.GetQueueUrlInput{
+		QueueName:              &l.queue,
+		QueueOwnerAWSAccountId: &l.acctId,
+	})
+
+	if err != nil {
 		return err
+	}
+
+	attrOut, err := svc.GetQueueAttributes(&sqs.GetQueueAttributesInput{
+		AttributeNames: []*string{&vistm},
+		QueueUrl:       urlResp.QueueUrl,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	val, err := strconv.Atoi(*attrOut.Attributes[vistm])
+	if err != nil {
+		return err
+	}
+
+	visibilityTm = val
+
+	if visibilityTm < 0 {
+		return err
+	}
+
+	if visibilityTm < 3 {
+		return fmt.Errorf("visibility timeout should be <= 3")
 	}
 
 	sub, err := awspubsub.NewSubscriber(awspubsub.SQSConfig{
@@ -156,7 +159,6 @@ func (l *SqsLengthySubscriber) Start(quit, done chan error) error {
 	})
 
 	if err != nil {
-		log.Printf("create sns/sqs sub failed, err=%v", err)
 		return err
 	}
 
@@ -169,23 +171,26 @@ func (l *SqsLengthySubscriber) Start(quit, done chan error) error {
 	go func() {
 		for {
 			select {
-			case m := <-pipe:
-				if m != nil {
-					var ticker = time.NewTicker(time.Duration(visibilityTm/2) * time.Second)
-					var end1 = make(chan error)
-					var end2 = make(chan error)
+			case sm := <-pipe:
+				if sm != nil {
+					var extend = (visibilityTm / 3) * 2
+					var ticker = time.NewTicker(time.Duration(extend) * time.Second)
+					var end = make(chan error)
+					var w sync.WaitGroup
 
-					go func() {
+					w.Add(2)
+
+					go func(m gzpubsub.SubscriberMessage) {
 						defer func() {
 							log.Printf("ack extender done for %v", m)
-							end2 <- nil
+							w.Done()
 						}()
 
 						extend := true
 
 						for {
 							select {
-							case <-end1:
+							case <-end:
 								return
 							case <-ticker.C:
 								if extend {
@@ -196,25 +201,28 @@ func (l *SqsLengthySubscriber) Start(quit, done chan error) error {
 										extend = false
 									}
 								}
+							default:
 							}
 						}
-					}()
+					}(sm)
 
-					_ = l.callback(m.Message())
+					go func(m gzpubsub.SubscriberMessage) {
+						defer func() {
+							end <- nil
+							m.Done()
+							w.Done()
+						}()
+
+						// Process our message via provided callback.
+						l.callback(m.Message())
+					}(sm)
 
 					// Close our extender goroutine.
-					end1 <- nil
-					_ = <-end2
+					w.Wait()
 					ticker.Stop()
-
-					// Remove message from queue.
-					err = m.Done()
-					if err != nil {
-						log.Printf("remove message from sub failed, err=%v", err)
-					}
 				}
 			case <-quit:
-				log.Printf("request termination...")
+				log.Printf("request termination")
 				finish <- nil
 				done <- nil
 				return
@@ -233,7 +241,7 @@ func NewSqsLengthySubscriber(queue string, callback SqsMessageCallback, o ...Sqs
 		region:          os.Getenv("AWS_REGION"),
 		accessKeyId:     os.Getenv("AWS_ACCESS_KEY_ID"),
 		secretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
-		acctId:          os.Getenv("AWS_WAVE_ACCT_ID"),
+		acctId:          os.Getenv("AWS_ACCT_ID"),
 		base64:          false,
 		timeout:         5,
 		callback:        callback,
