@@ -11,7 +11,7 @@ $ export AWS_SECRET_ACCESS_KEY=<some-value>
 $ go build -v
 ```
 
-Using AWS console, create an SQS queue with `testlengthyprocessing` as name. The default value for "Default Visibility Timeout" should be 30s. Then run the sample, preferably two instances to confirm that only one running instance will process the message even past the queue's visibility timeout.
+Using AWS console, create an SQS queue with `testlengthyprocessing` as name. The default value for "Default Visibility Timeout" should be 30s. Then run the sample, preferably two instances to confirm that only one running instance will process the message even past the queue's visibility timeout of 30s.
 
 ```bash
 # run the sample
