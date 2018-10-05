@@ -6,4 +6,7 @@ This is an example of consuming SQS messages in AWS with the potential of having
 $ export AWS_REGION=<some-region>
 $ export AWS_ACCESS_KEY_ID=<some-value>
 $ export AWS_SECRET_ACCESS_KEY=<some-value>
+
+# build the sample
+$ go build -v
 ```
