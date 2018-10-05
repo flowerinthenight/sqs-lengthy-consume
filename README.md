@@ -21,7 +21,7 @@ $ ./sqs-lengthy-consume
 
 Finally, send a test message using AWS console's "Send a Message" option under "Queue Actions" menu.
 
-```bash
+```
 2018/10/05 12:02:34 raw=test
 2018/10/05 12:02:34 simulate lengthy work (1min)
 2018/10/05 12:02:54 visibility timeout for [AQEBol+zZ7...] updated to 30
