@@ -10,3 +10,13 @@ $ export AWS_SECRET_ACCESS_KEY=<some-value>
 # build the sample
 $ go build -v
 ```
+
+Using AWS console, create an SQS queue with `testlengthyprocessing` as name. The default value for "Default Visibility Timeout" should be 30s. Then run the sample, preferably two instances to confirm that only one running instance will process the message even past the queue's visibility timeout.
+
+```bash
+# run the sample
+$ ./sqs-lengthy-consume
+2018/10/05 11:59:39 start listen, queue=testlengthyprocessing, visibility=30s
+```
+
+Finally, send a test message using AWS console.
