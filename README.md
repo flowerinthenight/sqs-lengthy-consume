@@ -3,6 +3,8 @@ This is an example of consuming SQS messages in AWS with the potential of having
 
 ## How to run
 For authentication, you can set the following environment variables with appropriate values:
-- `AWS_REGION`
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
+```bash
+AWS_REGION
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+```
