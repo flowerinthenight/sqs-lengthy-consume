@@ -16,7 +16,16 @@ Using AWS console, create an SQS queue with `testlengthyprocessing` as name. The
 ```bash
 # run the sample
 $ ./sqs-lengthy-consume
-2018/10/05 11:59:39 start listen, queue=testlengthyprocessing, visibility=30s
+2018/10/05 12:02:20 start listen, queue=testlengthyprocessing, visibility=30s
 ```
 
-Finally, send a test message using AWS console.
+Finally, send a test message using AWS console's "Send a Message" option under "Queue Actions" menu.
+
+```bash
+2018/10/05 12:02:34 raw=test
+2018/10/05 12:02:34 simulate lengthy work (1min)
+2018/10/05 12:02:54 visibility timeout for [AQEBol+zZ7...] updated to 30
+2018/10/05 12:03:14 visibility timeout for [AQEBol+zZ7...] updated to 30
+2018/10/05 12:03:34 fn=processCallback, duration=1m0.003743499s
+2018/10/05 12:03:34 visibility timeout extender done for [AQEBol+zZ7...]
+```
