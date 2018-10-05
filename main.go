@@ -26,7 +26,7 @@ func processCallback(v []byte) error {
 func main() {
 	quit := make(chan error)
 	done := make(chan error)
-	queue := "lengthysqs"
+	queue := "testlengthyprocessing"
 
 	go func() {
 		ls := longsubsqs.NewSqsLengthySubscriber(queue, processCallback)
